@@ -1,4 +1,4 @@
- MLOps with Kubeflow Pipelines  
+# 🚀 MLOps with Kubeflow Pipelines  
 
 An **end-to-end MLOps pipeline** built using **Kubeflow Pipelines (KFP)** for scalable, reproducible, and automated machine learning workflows.  
 This project demonstrates how to orchestrate data preprocessing, model training, evaluation, deployment, and monitoring in a **production-ready setup**.  
