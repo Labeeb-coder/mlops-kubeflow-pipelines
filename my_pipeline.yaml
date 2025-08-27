@@ -1,0 +1,209 @@
+# PIPELINE DEFINITION
+# Name: mlops-demo-pipeline
+# Description: A simple MLOps pipeline with data loading, training, and evaluation.
+# Outputs:
+#    evaluate-model-component-metrics_output: system.Metrics
+components:
+  comp-evaluate-model-component:
+    executorLabel: exec-evaluate-model-component
+    inputDefinitions:
+      artifacts:
+        model_input:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        test_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        metrics_output:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-load-data-component:
+    executorLabel: exec-load-data-component
+    outputDefinitions:
+      artifacts:
+        output_csv:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-model-component:
+    executorLabel: exec-train-model-component
+    inputDefinitions:
+      artifacts:
+        input_csv:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        model_output:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-evaluate-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn'\
+          \ 'joblib' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model_component(\n    model_input: Input[Model],\n \
+          \   test_data: Input[Dataset],\n    metrics_output: Output[Metrics]\n):\n\
+          \    # Load test data\n    df = pd.read_csv(test_data.path)\n    X_test\
+          \ = df.drop(\"target\", axis=1)\n    y_test = df[\"target\"]\n\n    # Load\
+          \ trained model\n    model = joblib.load(model_input.path)\n\n    # Predict\n\
+          \    y_pred = model.predict(X_test)\n\n    # Evaluate accuracy\n    acc\
+          \ = accuracy_score(y_test, y_pred)\n\n    # Log metrics\n    metrics_output.log_metric(\"\
+          accuracy\", float(acc))\n    print(f\"Model Accuracy: {acc}\")\n\n"
+        image: python:3.9
+    exec-load-data-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - load_data_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef load_data_component(output_csv: Output[Dataset]):\n    # Load\
+          \ Iris dataset from sklearn\n    iris = load_iris(as_frame=True)\n    df\
+          \ = iris.frame\n\n    # Save dataset to output path\n    df.to_csv(output_csv.path,\
+          \ index=False)\n\n"
+        image: python:3.7
+    exec-train-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model_component(input_csv: Input[Dataset], model_output:\
+          \ Output[Model]):\n    \"\"\"Train a simple Logistic Regression model.\"\
+          \"\"\n    df = pd.read_csv(input_csv.path)\n    X = df.drop(\"target\",\
+          \ axis=1)\n    y = df[\"target\"]\n\n    model = LogisticRegression(max_iter=200)\n\
+          \    model.fit(X, y)\n\n    joblib.dump(model, model_output.path)\n\n"
+        image: python:3.9
+pipelineInfo:
+  description: A simple MLOps pipeline with data loading, training, and evaluation.
+  name: mlops-demo-pipeline
+root:
+  dag:
+    outputs:
+      artifacts:
+        evaluate-model-component-metrics_output:
+          artifactSelectors:
+          - outputArtifactKey: metrics_output
+            producerSubtask: evaluate-model-component
+    tasks:
+      evaluate-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-model-component
+        dependentTasks:
+        - load-data-component
+        - train-model-component
+        inputs:
+          artifacts:
+            model_input:
+              taskOutputArtifact:
+                outputArtifactKey: model_output
+                producerTask: train-model-component
+            test_data:
+              taskOutputArtifact:
+                outputArtifactKey: output_csv
+                producerTask: load-data-component
+        taskInfo:
+          name: evaluate-model-component
+      load-data-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-load-data-component
+        taskInfo:
+          name: load-data-component
+      train-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model-component
+        dependentTasks:
+        - load-data-component
+        inputs:
+          artifacts:
+            input_csv:
+              taskOutputArtifact:
+                outputArtifactKey: output_csv
+                producerTask: load-data-component
+        taskInfo:
+          name: train-model-component
+  outputDefinitions:
+    artifacts:
+      evaluate-model-component-metrics_output:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0
